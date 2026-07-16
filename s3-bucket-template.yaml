@@ -1,0 +1,10 @@
+# CLOUDFORMATION TEMPLATE VERSION
+# DESCRIPTION
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Cloudformation template for S3 bucket'
+Resources:
+  S3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: 'akwganiu-bucket-yaml'

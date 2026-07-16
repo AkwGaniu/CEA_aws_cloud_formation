@@ -1,0 +1,5 @@
+Create Cloudformation Stack
+aws cloudformation create-stack --stack-name s3-bucket-stack --template-body file://file-name --profile akwg
+
+Describe Cloudformation Stack
+aws cloudformation describe-stacks --stack-name s3-bucket-stack --profile akwg

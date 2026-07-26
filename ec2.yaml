@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: "Cloudformation stack for VPC"
+Description: "Cloudformation template for Auto Scaling and Load balancer"
 
 Resources:
 # My VPC
@@ -131,81 +131,86 @@ Resources:
       SubnetId: !Ref PublicSubnet2B
       RouteTableId: !Ref PublicRouteTable
 
-# Bastion Host EC2
-  BastionHost:
+# Application Load Balancer
+  MyLoadBalancer:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      Subnets:
+        - !Ref PublicSubnet1A
+        - !Ref PublicSubnet2B
+      SecurityGroups:
+        - !Ref WebServerSecurityGroup
+  
+# Target group for ALB
+  TargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      VpcId: !Ref MyVpc
+      Port: 80
+      Protocol: 'HTTP'
+      Targets:
+        - Id: !Ref WebServerInstance1A
+        - Id: !Ref WebServerInstance2B
+
+# Listener for ALB
+  MyListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - Type: 'forward'
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref MyLoadBalancer
+      Port: 80
+      Protocol: 'HTTP'
+
+# WebServerSecurityGroup
+  WebServerSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Enable HTTP'
+      VpcId: !Ref MyVpc
+      SecurityGroupIngress:
+        - IpProtocol: 'tcp'
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'
+
+# WebServer Instance1A
+  WebServerInstance1A:
     Type: 'AWS::EC2::Instance'
     Properties:
-      InstanceType: t3.micro
-      KeyName: bastion-host-key
+      InstanceType: 't3.micro'
       ImageId: ami-072d67a4571a589e2
       SubnetId: !Ref PublicSubnet1A
       SecurityGroupIds:
-        - !Ref BastionSG
+        - !Ref WebServerSecurityGroup
       Tags:
         - Key: Name
-          Value: BastionHost
+          Value: WebServerInstance1A
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo 'Hello from My Web Server 1A' > /var/www/html/index.html
 
-# Bastion Security Group
-  BastionSG:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      GroupDescription: 'Enable SSH connection'
-      VpcId: !Ref MyVpc
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 81.104.235.97/32
-
-# App Instance1A
-  AppPrivateInstance1A:
+# WebServer Instance2b
+  WebServerInstance2B:
     Type: 'AWS::EC2::Instance'
     Properties:
-      InstanceType: t3.micro
-      KeyName: bastion-host-key
+      InstanceType: 't3.micro'
       ImageId: ami-072d67a4571a589e2
-      SubnetId: !Ref AppPrivateSubnet1A
+      SubnetId: !Ref PublicSubnet2B
       SecurityGroupIds:
-        - !Ref AppInstance1ASG #Note: create a new security group
+        - !Ref WebServerSecurityGroup
       Tags:
         - Key: Name
-          Value: AppPrivateInstance1A
-
-# App Private Instance2B
-  AppPrivateInstance2B:
-    Type: 'AWS::EC2::Instance'
-    Properties:
-      InstanceType: t3.micro
-      KeyName: bastion-host-key
-      ImageId: ami-072d67a4571a589e2
-      SubnetId: !Ref AppPrivateSubnet2B
-      SecurityGroupIds:
-        - !Ref AppInstance2BSG #Note: create a new security group
-      Tags:
-        - Key: Name
-          Value: AppPrivateInstance2B
-
-# Security Group App1A
-  AppInstance1ASG:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      GroupDescription: 'Allow SSH connection from Bastion'
-      VpcId: !Ref MyVpc
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          SourceSecurityGroupId: !Ref BastionSG
-
-
-# Security Group App2B
-  AppInstance2BSG:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      GroupDescription: 'Allow ping request from AppInstance1A'
-      VpcId: !Ref MyVpc
-      SecurityGroupIngress:
-        - IpProtocol: icmp
-          FromPort: -1
-          ToPort: -1
-          SourceSecurityGroupId: !Ref AppInstance1ASG
+          Value: WebServerInstance2B
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo 'Hello from My Web Server 2B' > /var/www/html/index.html

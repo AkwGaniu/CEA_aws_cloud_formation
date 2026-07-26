@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: "Cloudformation stack for VPC"
+Description: "Cloudformation template for Auto Scaling and Load balancer"
 
 Resources:
 # My VPC
@@ -131,81 +131,66 @@ Resources:
       SubnetId: !Ref PublicSubnet2B
       RouteTableId: !Ref PublicRouteTable
 
-# Bastion Host EC2
-  BastionHost:
-    Type: 'AWS::EC2::Instance'
-    Properties:
-      InstanceType: t3.micro
-      KeyName: bastion-host-key
-      ImageId: ami-072d67a4571a589e2
-      SubnetId: !Ref PublicSubnet1A
-      SecurityGroupIds:
-        - !Ref BastionSG
-      Tags:
-        - Key: Name
-          Value: BastionHost
-
-# Bastion Security Group
-  BastionSG:
+# WebServerSecurityGroup
+  WebServerSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      GroupDescription: 'Enable SSH connection'
+      GroupDescription: 'Enable HTTP'
       VpcId: !Ref MyVpc
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 81.104.235.97/32
+        - IpProtocol: 'tcp'
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'
 
-# App Instance1A
-  AppPrivateInstance1A:
-    Type: 'AWS::EC2::Instance'
+# Lunch Configuration
+  MyLunchConfiguration:
+    Type: 'AWS::AutoScaling::LaunchConfiguration'
     Properties:
-      InstanceType: t3.micro
-      KeyName: bastion-host-key
       ImageId: ami-072d67a4571a589e2
-      SubnetId: !Ref AppPrivateSubnet1A
-      SecurityGroupIds:
-        - !Ref AppInstance1ASG #Note: create a new security group
-      Tags:
-        - Key: Name
-          Value: AppPrivateInstance1A
+      InstanceType: 't3.micro'
+      SecurityGroups:
+        - ! Ref WebServerSecurityGroup
+      UserData:
+        Fn:Base64: !Sub |
+          #!/bin/bash
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable htttpd
+          echo 'Hello from my Auto Scaling Intances' > /var/www/html/index.html
 
-# App Private Instance2B
-  AppPrivateInstance2B:
-    Type: 'AWS::EC2::Instance'
+# Auto Scaling Group
+  MyAutoScalingGroup:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
-      InstanceType: t3.micro
-      KeyName: bastion-host-key
-      ImageId: ami-072d67a4571a589e2
-      SubnetId: !Ref AppPrivateSubnet2B
-      SecurityGroupIds:
-        - !Ref AppInstance2BSG #Note: create a new security group
-      Tags:
-        - Key: Name
-          Value: AppPrivateInstance2B
-
-# Security Group App1A
-  AppInstance1ASG:
-    Type: 'AWS::EC2::SecurityGroup'
+      LaunchConfigurationName: !Ref MyLunchConfiguration
+      MinSize: 1
+      MaxSize: 3
+      DesiredCapacity: 2
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet1A
+        - !Ref PublicSubnet2B
+  
+# Cloudwatch Alarm to Monitor the AutoScaling Group
+  HighCPUAlarm:
+    Type: 'AWS::CloudWatch:Alarm'
     Properties:
-      GroupDescription: 'Allow SSH connection from Bastion'
-      VpcId: !Ref MyVpc
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          SourceSecurityGroupId: !Ref BastionSG
+      AlarmDescription: 'Alarm to know when CPU usage exceeds 70%'
+      MetricName: CPUUtilization
+      Namespace: 'AWS/EC2'
+      Statistics: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 70
+      ComparisonOperator: GreatherThanThreshold
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: ! Ref MyAutoScalingGroup
+      AlarmActions:
+        - ! Ref ScaleOutPolicy
 
-
-# Security Group App2B
-  AppInstance2BSG:
-    Type: 'AWS::EC2::SecurityGroup'
+# Scale Out Policy
+  ScaleOutPolicy:
+    Type: 'AWS:AutoScaling:ScalingOut'
     Properties:
-      GroupDescription: 'Allow ping request from AppInstance1A'
-      VpcId: !Ref MyVpc
-      SecurityGroupIngress:
-        - IpProtocol: icmp
-          FromPort: -1
-          ToPort: -1
-          SourceSecurityGroupId: !Ref AppInstance1ASG
+      

@@ -1,5 +1,14 @@
 Create Cloudformation Stack
-aws cloudformation create-stack --stack-name s3-bucket-stack --template-body file://file-name --profile akwg
+aws cloudformation create-stack --stack-name stack-name --template-body file://file-name --profile profile-name
 
 Describe Cloudformation Stack
-aws cloudformation describe-stacks --stack-name s3-bucket-stack --profile akwg
+aws cloudformation describe-stacks --stack-name stack-name --profile profile-name
+
+Delete Stack
+aws cloudformation delete-stack --stack-name stack-name
+
+SSH On to EC2 Server
+ssh -i path-to-key-pair ec2-user@<ec2-ip-address>
+
+Secure file copy 
+scp local-file-path file-name ec2-user@<ec2-ip-address>:~/

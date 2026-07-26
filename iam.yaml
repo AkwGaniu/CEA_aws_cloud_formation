@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IAM Cloudformation template'
+
+Resources:
+# IAM User
+  MyIAMUser:
+    Type: 'AWS::IAM::User'
+    Properties:
+      UserName: akwGaniuCFN
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'
+      # Groups:
+      #   - !Ref DevGroup
+
+# IAM Group
+  DevGroup:
+    Type: 'AWS::IAM::Group'
+    Properties:
+      GroupName: DevelopersCFN
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonDynamoDBReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AmazonCognitoPowerUser'
+
+# Attach IAM User to Group
+  AddUserToGroup:
+    Type: 'AWS::IAM::UserToGroupAddition'
+    Properties:
+      GroupName: !Ref DevGroup
+      Users:
+        - !Ref MyIAMUser
+
+# IAM Quality Assurance Role
+  MyIAMRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/PowerUserAccess'
+
+# IAM Policy for the developer group
+  IAMPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: CFNCustomS3Policy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - 's3:Describe*'
+              - 's3:List*'
+              - 's3:Get*'
+            Resource: '*'
+      Roles:
+        - !Ref MyIAMRole
+
+    

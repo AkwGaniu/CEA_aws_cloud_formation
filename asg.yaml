@@ -6,7 +6,7 @@ Resources:
   MyVpc:
     Type: 'AWS::EC2::VPC'
     Properties:
-      CidrBlock: '173.10.0.0/16'
+      CidrBlock: '172.16.0.0/16'
       EnableDnsSupport: true
       EnableDnsHostnames: true
       Tags:
@@ -18,7 +18,7 @@ Resources:
     Type: 'AWS::EC2::Subnet'
     Properties:
       VpcId: !Ref MyVpc
-      CidrBlock: '173.10.1.0/24'
+      CidrBlock: '172.16.1.0/24'
       AvailabilityZone: !Select [0, !GetAZs '']
       MapPublicIpOnLaunch: true
       Tags:
@@ -30,7 +30,7 @@ Resources:
     Type: 'AWS::EC2::Subnet'
     Properties:
       VpcId: !Ref MyVpc
-      CidrBlock: '173.10.2.0/24'
+      CidrBlock: '172.16.2.0/24'
       AvailabilityZone: !Select [0, !GetAZs '']
       Tags:
         - Key: Name
@@ -41,7 +41,7 @@ Resources:
     Type: 'AWS::EC2::Subnet'
     Properties:
       VpcId: !Ref MyVpc
-      CidrBlock: '173.10.3.0/24'
+      CidrBlock: '172.16.3.0/24'
       AvailabilityZone: !Select [0, !GetAZs '']
       Tags:
         - Key: Name
@@ -52,7 +52,7 @@ Resources:
     Type: 'AWS::EC2::Subnet'
     Properties:
       VpcId: !Ref MyVpc
-      CidrBlock: '173.10.4.0/24'
+      CidrBlock: '172.16.4.0/24'
       AvailabilityZone: !Select [1, !GetAZs '']
       MapPublicIpOnLaunch: true
       Tags:
@@ -64,7 +64,7 @@ Resources:
     Type: 'AWS::EC2::Subnet'
     Properties:
       VpcId: !Ref MyVpc
-      CidrBlock: '173.10.5.0/24'
+      CidrBlock: '172.16.5.0/24'
       AvailabilityZone: !Select [1, !GetAZs '']
       Tags:
         - Key: Name
@@ -75,7 +75,7 @@ Resources:
     Type: 'AWS::EC2::Subnet'
     Properties:
       VpcId: !Ref MyVpc
-      CidrBlock: '173.10.6.0/24'
+      CidrBlock: '172.16.6.0/24'
       AvailabilityZone: !Select [1, !GetAZs '']
       Tags:
         - Key: Name
@@ -143,54 +143,61 @@ Resources:
           ToPort: 80
           CidrIp: '0.0.0.0/0'
 
-# Lunch Configuration
-  MyLunchConfiguration:
-    Type: 'AWS::AutoScaling::LaunchConfiguration'
+# Lunch Template
+  MyLaunchTemplate:
+    Type: 'AWS::EC2::LaunchTemplate'
     Properties:
-      ImageId: ami-072d67a4571a589e2
-      InstanceType: 't3.micro'
-      SecurityGroups:
-        - ! Ref WebServerSecurityGroup
-      UserData:
-        Fn:Base64: !Sub |
-          #!/bin/bash
-          yum install -y httpd
-          systemctl start httpd
-          systemctl enable htttpd
-          echo 'Hello from my Auto Scaling Intances' > /var/www/html/index.html
+      LaunchTemplateData:
+        ImageId: ami-0c6c510969ad0a899
+        InstanceType: 't3.micro'
+        SecurityGroupIds:
+          - !Ref WebServerSecurityGroup
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            yum install -y httpd
+            systemctl start httpd
+            systemctl enable httpd
+            echo 'Hello from my Auto Scaling Intances' > /var/www/html/index.html
 
 # Auto Scaling Group
   MyAutoScalingGroup:
     Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
-      LaunchConfigurationName: !Ref MyLunchConfiguration
       MinSize: 1
       MaxSize: 3
       DesiredCapacity: 2
       VPCZoneIdentifier:
         - !Ref PublicSubnet1A
         - !Ref PublicSubnet2B
+      LaunchTemplate:
+        LaunchTemplateId: !Ref MyLaunchTemplate
+        Version: !GetAtt MyLaunchTemplate.LatestVersionNumber
   
 # Cloudwatch Alarm to Monitor the AutoScaling Group
   HighCPUAlarm:
-    Type: 'AWS::CloudWatch:Alarm'
+    Type: 'AWS::CloudWatch::Alarm'
     Properties:
       AlarmDescription: 'Alarm to know when CPU usage exceeds 70%'
       MetricName: CPUUtilization
       Namespace: 'AWS/EC2'
-      Statistics: Average
+      Statistic: Average
       Period: 300
       EvaluationPeriods: 1
       Threshold: 70
-      ComparisonOperator: GreatherThanThreshold
+      ComparisonOperator: GreaterThanThreshold
       Dimensions:
         - Name: AutoScalingGroupName
-          Value: ! Ref MyAutoScalingGroup
+          Value: !Ref MyAutoScalingGroup
       AlarmActions:
-        - ! Ref ScaleOutPolicy
+        - !Ref ScaleOutPolicy
 
 # Scale Out Policy
   ScaleOutPolicy:
-    Type: 'AWS:AutoScaling:ScalingOut'
+    Type: 'AWS::AutoScaling::ScalingPolicy'
     Properties:
-      
+      AutoScalingGroupName: !Ref MyAutoScalingGroup
+      PolicyType: SimpleScaling
+      ScalingAdjustment: 1
+      Cooldown: 300
+      AdjustmentType: ChangeInCapacity

@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: "Cloudformation template for Auto Scaling and Load balancer"
+Description: "Cloudformation template for Load balancer"
 
 Resources:
 # My VPC

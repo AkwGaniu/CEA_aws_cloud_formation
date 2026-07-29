@@ -1,0 +1,14 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'RDS Cloudformation Template'
+
+Resources:
+  MyCFnRDSDB:
+    Type: 'AWS::RDS::DBInstance'
+    Properties:
+      DBInstanceIdentifier: 'MyNewRDSDb'
+      MasterUsername: 'admin'
+      MasterUserPassword: 'password'
+      DBInstanceClass: 'db.t4g.micro'
+      Engine: 'mysql'
+      EngineVersion: '8.4'
+      AllocatedStorage: 20
